@@ -15,7 +15,9 @@
 
 # Command Line History (newest to oldest):
 :wq
-|2,0,1682554221,,"wq"
+|2,0,1682615377,,"wq"
+:wqq
+|2,0,1682556231,,"wqq"
 :q!
 |2,0,1679431746,,"q!"
 :wq!
@@ -46,67 +48,397 @@
 	l
 |3,0,0,0,1,0,1675981897,"l"
 ""1	LINE	0
-	Hol
-|3,1,1,1,1,0,1682554202,"Hol"
-"2	LINE	0
-		return ((int) *c);
-|3,0,2,1,1,0,1682554042,"	return ((int) *c);"
-"3	LINE	0
-	#include "main.h"
+	#include <elf.h>
+	#include <sys/types.h>
+	#include <sys/stat.h>
+	#include <fcntl.h>
+	#include <unistd.h>
+	#include <stdio.h>
+	#include <stdlib.h>
 	
-	int get_endianness(void)
+	void check_elf(unsigned char *e_ident);
+	void print_magic(unsigned char *e_ident);
+	void print_class(unsigned char *e_ident);
+	void print_data(unsigned char *e_ident);
+	void print_version(unsigned char *e_ident);
+	void print_abi(unsigned char *e_ident);
+	void print_osabi(unsigned char *e_ident);
+	void print_type(unsigned int e_type, unsigned char *e_ident);
+	void print_entry(unsigned long int e_entry, unsigned char *e_ident);
+	void close_elf(int elf);
+	
+	/**
+	 * check_elf - Checks if a file is an ELF file.
+	 * @e_ident: A pointer to an array containing the ELF magic numbers.
+	 *
+	 * Description: If the file is not an ELF file - exit code 98.
+	 */
+	void check_elf(unsigned char *e_ident)
 	{
-		unsigned int a;
-		char *c;
+		int index;
 	
-		a = 1;
-		c = (char *) &a;
-	
-|3,0,3,1,10,0,1682554037,"#include \"main.h\"","","int get_endianness(void)","{","	unsigned int a;","	char *c;","","	a = 1;","	c = (char *) &a;",""
-"4	LINE	0
+		for (index = 0; index < 4; index++)
+		{
+			if (e_ident[index] != 127 &&
+			    e_ident[index] != 'E' &&
+			    e_ident[index] != 'L' &&
+			    e_ident[index] != 'F')
+			{
+				dprintf(STDERR_FILENO, "Error: Not an ELF file\n");
+				exit(98);
+			}
+		}
 	}
 	
+	/**
+	 * print_magic - Prints the magic numbers of an ELF header.
+	 * @e_ident: A pointer to an array containing the ELF magic numbers.
+	 *
+	 * Description: Magic numbers are separated by spaces.
+	 */
+	void print_magic(unsigned char *e_ident)
+	{
+|3,1,1,1,50,0,1682557790,"#include <elf.h>","#include <sys/types.h>","#include <sys/stat.h>","#include <fcntl.h>","#include <unistd.h>","#include <stdio.h>","#include <stdlib.h>","","void check_elf(unsigned char *e_ident);","void print_magic(unsigned char *e_ident);","void print_class(unsigned char *e_ident);","void print_data(unsigned char *e_ident);","void print_version(unsigned char *e_ident);","void print_abi(unsigned char *e_ident);",>43
+|<"void print_osabi(unsigned char *e_ident);","void print_type(unsigned int e_type, unsigned char *e_ident);","void print_entry(unsigned long int e_entry, unsigned char *e_ident);","void close_elf(int elf);","","/**"," * check_elf - Checks if a file is an ELF file."," * @e_ident: A pointer to an array containing the ELF magic numbers."," *"," * Description: If the file is not an ELF file - exit code 98."," */","void check_elf(unsigned char *e_ident)","{","	int index;","",>38
+|<"	for (index = 0; index < 4; index++)","	{","		if (e_ident[index] != 127 &&","		    e_ident[index] != 'E' &&","		    e_ident[index] != 'L' &&","		    e_ident[index] != 'F')","		{","			dprintf(STDERR_FILENO, \"Error: Not an ELF file\\n\");","			exit(98);","		}","	}","}","","/**"," * print_magic - Prints the magic numbers of an ELF header."," * @e_ident: A pointer to an array containing the ELF magic numbers."," *"," * Description: Magic numbers are separated by spaces."," */",>42
+|<"void print_magic(unsigned char *e_ident)","{"
+"2	LINE	0
+		int o, r;
 	
-|3,0,4,1,3,0,1682554020,"}","",""
+		o = open(argv[1], O_RDONLY);
+		if (o == -1)
+		{
+			dprintf(STDERR_FILENO, "Error: Can't read file %s\n", argv[1]);
+			exit(98);
+		}
+		header = malloc(sizeof(Elf64_Ehdr));
+		if (header == NULL)
+		{
+			close_elf(o);
+			dprintf(STDERR_FILENO, "Error: Can't read file %s\n", argv[1]);
+			exit(98);
+		}
+		r = read(o, header, sizeof(Elf64_Ehdr));
+		if (r == -1)
+		{
+			free(header);
+			close_elf(o);
+			dprintf(STDERR_FILENO, "Error: `%s`: No such file\n", argv[1]);
+			exit(98);
+		}
+	
+		check_elf(header->e_ident);
+		printf("ELF Header:\n");
+		print_magic(header->e_ident);
+		print_class(header->e_ident);
+		print_data(header->e_ident);
+		print_version(header->e_ident);
+		print_osabi(header->e_ident);
+		print_abi(header->e_ident);
+		print_type(header->e_type, header->e_ident);
+		print_entry(header->e_entry, header->e_ident);
+	
+		free(header);
+		close_elf(o);
+		return (0);
+	}
+|3,0,2,1,39,0,1682557742,"	int o, r;","","	o = open(argv[1], O_RDONLY);","	if (o == -1)","	{","		dprintf(STDERR_FILENO, \"Error: Can't read file %s\\n\", argv[1]);","		exit(98);","	}","	header = malloc(sizeof(Elf64_Ehdr));","	if (header == NULL)","	{","		close_elf(o);","		dprintf(STDERR_FILENO, \"Error: Can't read file %s\\n\", argv[1]);","		exit(98);","	}","	r = read(o, header, sizeof(Elf64_Ehdr));","	if (r == -1)","	{","		free(header);","		close_elf(o);",>70
+|<"		dprintf(STDERR_FILENO, \"Error: `%s`: No such file\\n\", argv[1]);","		exit(98);","	}","","	check_elf(header->e_ident);","	printf(\"ELF Header:\\n\");","	print_magic(header->e_ident);","	print_class(header->e_ident);","	print_data(header->e_ident);","	print_version(header->e_ident);","	print_osabi(header->e_ident);","	print_abi(header->e_ident);","	print_type(header->e_type, header->e_ident);","	print_entry(header->e_entry, header->e_ident);","","	free(header);","	close_elf(o);",>14
+|<"	return (0);","}"
+"3	LINE	0
+		}
+	}
+	
+	/**
+	 * print_abi - Prints the ABI version of an ELF header.
+	 * @e_ident: A pointer to an array containing the ELF ABI version.
+	 */
+	void print_abi(unsigned char *e_ident)
+	{
+		printf("  ABI Version:                       %d\n",
+		       e_ident[EI_ABIVERSION]);
+	}
+	
+	/**
+	 * print_type - Prints the type of an ELF header.
+	 * @e_type: The ELF type.
+	 * @e_ident: A pointer to an array containing the ELF class.
+	 */
+	void print_type(unsigned int e_type, unsigned char *e_ident)
+	{
+		if (e_ident[EI_DATA] == ELFDATA2MSB)
+			e_type >>= 8;
+	
+		printf("  Type:                              ");
+	
+		switch (e_type)
+		{
+		case ET_NONE:
+			printf("NONE (None)\n");
+			break;
+		case ET_REL:
+			printf("REL (Relocatable file)\n");
+			break;
+		case ET_EXEC:
+			printf("EXEC (Executable file)\n");
+			break;
+		case ET_DYN:
+			printf("DYN (Shared object file)\n");
+			break;
+		case ET_CORE:
+			printf("CORE (Core file)\n");
+			break;
+		default:
+			printf("<unknown: %x>\n", e_type);
+		}
+	}
+	
+	/**
+	 * print_entry - Prints the entry point of an ELF header.
+	 * @e_entry: The address of the ELF entry point.
+|3,0,3,1,50,0,1682557737,"	}","}","","/**"," * print_abi - Prints the ABI version of an ELF header."," * @e_ident: A pointer to an array containing the ELF ABI version."," */","void print_abi(unsigned char *e_ident)","{","	printf(\"  ABI Version:                       %d\\n\",","	       e_ident[EI_ABIVERSION]);","}","","/**"," * print_type - Prints the type of an ELF header."," * @e_type: The ELF type.",>62
+|<" * @e_ident: A pointer to an array containing the ELF class."," */","void print_type(unsigned int e_type, unsigned char *e_ident)","{","	if (e_ident[EI_DATA] == ELFDATA2MSB)","		e_type >>= 8;","","	printf(\"  Type:                              \");","","	switch (e_type)","	{","	case ET_NONE:","		printf(\"NONE (None)\\n\");","		break;","	case ET_REL:","		printf(\"REL (Relocatable file)\\n\");","		break;","	case ET_EXEC:","		printf(\"EXEC (Executable file)\\n\");","		break;",>15
+|<"	case ET_DYN:","		printf(\"DYN (Shared object file)\\n\");","		break;","	case ET_CORE:","		printf(\"CORE (Core file)\\n\");","		break;","	default:","		printf(\"<unknown: %x>\\n\", e_type);","	}","}","","/**"," * print_entry - Prints the entry point of an ELF header."," * @e_entry: The address of the ELF entry point."
+"4	LINE	0
+	 * @e_ident: A pointer to an array containing the ELF version.
+	 */
+	void print_version(unsigned char *e_ident)
+	{
+		printf("  Version:                           %d",
+		       e_ident[EI_VERSION]);
+	
+		switch (e_ident[EI_VERSION])
+		{
+		case EV_CURRENT:
+			printf(" (current)\n");
+			break;
+		default:
+			printf("\n");
+			break;
+		}
+	}
+	
+	/**
+	 * print_osabi - Prints the OS/ABI of an ELF header.
+	 * @e_ident: A pointer to an array containing the ELF version.
+	 */
+	void print_osabi(unsigned char *e_ident)
+	{
+		printf("  OS/ABI:                            ");
+	
+		switch (e_ident[EI_OSABI])
+		{
+		case ELFOSABI_NONE:
+			printf("UNIX - System V\n");
+			break;
+		case ELFOSABI_HPUX:
+			printf("UNIX - HP-UX\n");
+			break;
+		case ELFOSABI_NETBSD:
+			printf("UNIX - NetBSD\n");
+			break;
+		case ELFOSABI_LINUX:
+			printf("UNIX - Linux\n");
+			break;
+		case ELFOSABI_SOLARIS:
+			printf("UNIX - Solaris\n");
+			break;
+		case ELFOSABI_IRIX:
+			printf("UNIX - IRIX\n");
+			break;
+		case ELFOSABI_FREEBSD:
+			printf("UNIX - FreeBSD\n");
+			break;
+		case ELFOSABI_TRU64:
+|3,0,4,1,50,0,1682557732," * @e_ident: A pointer to an array containing the ELF version."," */","void print_version(unsigned char *e_ident)","{","	printf(\"  Version:                           %d\",","	       e_ident[EI_VERSION]);","","	switch (e_ident[EI_VERSION])","	{","	case EV_CURRENT:","		printf(\" (current)\\n\");","		break;","	default:","		printf(\"\\n\");","		break;","	}","}","","/**"," * print_osabi - Prints the OS/ABI of an ELF header.",>64
+|<" * @e_ident: A pointer to an array containing the ELF version."," */","void print_osabi(unsigned char *e_ident)","{","	printf(\"  OS/ABI:                            \");","","	switch (e_ident[EI_OSABI])","	{","	case ELFOSABI_NONE:","		printf(\"UNIX - System V\\n\");","		break;","	case ELFOSABI_HPUX:","		printf(\"UNIX - HP-UX\\n\");","		break;","	case ELFOSABI_NETBSD:","		printf(\"UNIX - NetBSD\\n\");","		break;","	case ELFOSABI_LINUX:","		printf(\"UNIX - Linux\\n\");","		break;",>25
+|<"	case ELFOSABI_SOLARIS:","		printf(\"UNIX - Solaris\\n\");","		break;","	case ELFOSABI_IRIX:","		printf(\"UNIX - IRIX\\n\");","		break;","	case ELFOSABI_FREEBSD:","		printf(\"UNIX - FreeBSD\\n\");","		break;","	case ELFOSABI_TRU64:"
 "5	LINE	0
-		if (*n & a)
-|3,0,5,1,1,0,1682553525,"	if (*n & a)"
-"6	LINE	0
+		{
+			printf("%02x", e_ident[index]);
 	
-|3,0,6,1,1,0,1682553523,""
+			if (index == EI_NIDENT - 1)
+				printf("\n");
+			else
+				printf(" ");
+		}
+	}
+	
+	/**
+	 * print_class - Prints the class of an ELF header.
+	 * @e_ident: A pointer to an array containing the ELF class.
+	 */
+	void print_class(unsigned char *e_ident)
+	{
+		printf("  Class:                             ");
+	
+		switch (e_ident[EI_CLASS])
+		{
+		case ELFCLASSNONE:
+			printf("none\n");
+			break;
+		case ELFCLASS32:
+			printf("ELF32\n");
+			break;
+		case ELFCLASS64:
+			printf("ELF64\n");
+			break;
+		default:
+			printf("<unknown: %x>\n", e_ident[EI_CLASS]);
+		}
+	}
+	
+	/**
+	 * print_data - Prints the data of an ELF header.
+	 * @e_ident: A pointer to an array containing the ELF class.
+	 */
+	void print_data(unsigned char *e_ident)
+	{
+		printf("  Data:                              ");
+	
+		switch (e_ident[EI_DATA])
+		{
+		case ELFDATANONE:
+			printf("none\n");
+			break;
+		case ELFDATA2LSB:
+			printf("2's complement, little endian\n");
+			break;
+|3,0,5,1,50,0,1682557728,"	{","		printf(\"%02x\", e_ident[index]);","","		if (index == EI_NIDENT - 1)","			printf(\"\\n\");","		else","			printf(\" \");","	}","}","","/**"," * print_class - Prints the class of an ELF header."," * @e_ident: A pointer to an array containing the ELF class."," */","void print_class(unsigned char *e_ident)","{","	printf(\"  Class:                             \");","","	switch (e_ident[EI_CLASS])","	{","	case ELFCLASSNONE:",>24
+|<"		printf(\"none\\n\");","		break;","	case ELFCLASS32:","		printf(\"ELF32\\n\");","		break;","	case ELFCLASS64:","		printf(\"ELF64\\n\");","		break;","	default:","		printf(\"<unknown: %x>\\n\", e_ident[EI_CLASS]);","	}","}","","/**"," * print_data - Prints the data of an ELF header."," * @e_ident: A pointer to an array containing the ELF class."," */","void print_data(unsigned char *e_ident)","{","	printf(\"  Data:                              \");","","	switch (e_ident[EI_DATA])","	{",>20
+|<"	case ELFDATANONE:","		printf(\"none\\n\");","		break;","	case ELFDATA2LSB:","		printf(\"2's complement, little endian\\n\");","		break;"
+"6	LINE	0
+	/*
+	 * File: 100-elf_header.c
+	 * Auth: Brennan D Baraban
+	 */
+	
+	#include <elf.h>
+	#include <sys/types.h>
+	#include <sys/stat.h>
+	#include <fcntl.h>
+	#include <unistd.h>
+	#include <stdio.h>
+	#include <stdlib.h>
+	
+	void check_elf(unsigned char *e_ident);
+	void print_magic(unsigned char *e_ident);
+	void print_class(unsigned char *e_ident);
+	void print_data(unsigned char *e_ident);
+	void print_version(unsigned char *e_ident);
+	void print_abi(unsigned char *e_ident);
+	void print_osabi(unsigned char *e_ident);
+	void print_type(unsigned int e_type, unsigned char *e_ident);
+	void print_entry(unsigned long int e_entry, unsigned char *e_ident);
+	void close_elf(int elf);
+	
+	/**
+	 * check_elf - Checks if a file is an ELF file.
+	 * @e_ident: A pointer to an array containing the ELF magic numbers.
+	 *
+	 * Description: If the file is not an ELF file - exit code 98.
+	 */
+	void check_elf(unsigned char *e_ident)
+	{
+		int index;
+	
+		for (index = 0; index < 4; index++)
+		{
+			if (e_ident[index] != 127 &&
+			    e_ident[index] != 'E' &&
+			    e_ident[index] != 'L' &&
+			    e_ident[index] != 'F')
+			{
+				dprintf(STDERR_FILENO, "Error: Not an ELF file\n");
+				exit(98);
+			}
+		}
+	}
+	
+	/**
+	 * print_magic - Prints the magic numbers of an ELF header.
+	 * @e_ident: A pointer to an array containing the ELF magic numbers.
+|3,0,6,1,50,0,1682557722,"/*"," * File: 100-elf_header.c"," * Auth: Brennan D Baraban"," */","","#include <elf.h>","#include <sys/types.h>","#include <sys/stat.h>","#include <fcntl.h>","#include <unistd.h>","#include <stdio.h>","#include <stdlib.h>","","void check_elf(unsigned char *e_ident);","void print_magic(unsigned char *e_ident);","void print_class(unsigned char *e_ident);","void print_data(unsigned char *e_ident);",>45
+|<"void print_version(unsigned char *e_ident);","void print_abi(unsigned char *e_ident);","void print_osabi(unsigned char *e_ident);","void print_type(unsigned int e_type, unsigned char *e_ident);","void print_entry(unsigned long int e_entry, unsigned char *e_ident);","void close_elf(int elf);","","/**"," * check_elf - Checks if a file is an ELF file."," * @e_ident: A pointer to an array containing the ELF magic numbers."," *",>64
+|<" * Description: If the file is not an ELF file - exit code 98."," */","void check_elf(unsigned char *e_ident)","{","	int index;","","	for (index = 0; index < 4; index++)","	{","		if (e_ident[index] != 127 &&","		    e_ident[index] != 'E' &&","		    e_ident[index] != 'L' &&","		    e_ident[index] != 'F')","		{","			dprintf(STDERR_FILENO, \"Error: Not an ELF file\\n\");","			exit(98);","		}","	}","}","","/**"," * print_magic - Prints the magic numbers of an ELF header.",>70
+|<" * @e_ident: A pointer to an array containing the ELF magic numbers."
 "7	LINE	0
 	#include "main.h"
 	
-	int clear_bit(unsigned long int *n, unsigned int index)
+	int create_file(const char *filename, char *text_content)
 	{
-		unsigned int a;
+		int f;
+		int lettern;
+		int rwr;
 	
-		if (index > 63)
+		if (!filename)
 			return (-1);
-		
-		a = 1 << index;
-|3,0,7,1,10,0,1682553519,"#include \"main.h\"","","int clear_bit(unsigned long int *n, unsigned int index)","{","	unsigned int a;","","	if (index > 63)","		return (-1);","	","	a = 1 << index;"
-"8	LINE	0
-			*n ^= a;
-		return (1);
+	
+		f = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0600);
+	
+		if (f == -1)
+			return (-1);
+	
+		if (!text_content)
+			text_content = "";
+	
+		for (lettern = 0; text_content[lettern]; lettern++)
+			;
+	
+		rwr = write(f, text_content, lettern);
+		if (rwr == -1)
+			 return (-1);
+	
+	       	close(f);
+	
+		 return (1);
 	}
-|3,0,8,1,3,0,1682553513,"		*n ^= a;","	return (1);","}"
-"9	LINE	0
+|3,0,7,1,30,0,1682556975,"#include \"main.h\"","","int create_file(const char *filename, char *text_content)","{","	int f;","	int lettern;","	int rwr;","","	if (!filename)","		return (-1);","","	f = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0600);","","	if (f == -1)","		return (-1);","","	if (!text_content)","		text_content = \"\";","","	for (lettern = 0; text_content[lettern]; lettern++)","		;","","	rwr = write(f, text_content, lettern);",>17
+|<"	if (rwr == -1)","		 return (-1);","","       	close(f);","","	 return (1);","}"
+"8	LINE	0
 	#include "main.h"
 	
-	int set_bit(unsigned long int *n, unsigned int index)
+	/**
+	 * read_textfile - reads a text file and prints the letters
+	 * @filename: filename.
+	 * @letters: numbers of letters printed.
+	 *
+	 * Return: numbers of letters printed. It fails, returns 0.
+	 */
+	ssize_t read_textfile(const char *filename, size_t letters)
 	{
-		unsigned int i;
+		int fd;
+		ssize_t nrd, nwr;
+		char *buf;
 	
-		if (index > 63)
-			return (-1);
+		if (!filename)
+			return (0);
 	
-		i = 1 << index;
-		*n = (*n | i);
+		fd = open(filename, O_RDONLY);
 	
-		return (1);
+		if (fd == -1)
+			return (0);
+	
+		buf = malloc(sizeof(char) * (letters));
+		if (!buf)
+			return (0);
+	
+		nrd = read(fd, buf, letters);
+		nwr = write(STDOUT_FILENO, buf, nrd);
+	
+		close(fd);
+	
+		free(buf);
+	
+		return (nwr);
 	}
-|3,0,9,1,14,0,1682553397,"#include \"main.h\"","","int set_bit(unsigned long int *n, unsigned int index)","{","	unsigned int i;","","	if (index > 63)","		return (-1);","","	i = 1 << index;","	*n = (*n | i);","","	return (1);","}"
+|3,0,8,1,36,0,1682556747,"#include \"main.h\"","","/**"," * read_textfile - reads a text file and prints the letters"," * @filename: filename."," * @letters: numbers of letters printed."," *"," * Return: numbers of letters printed. It fails, returns 0."," */","ssize_t read_textfile(const char *filename, size_t letters)","{","	int fd;","	ssize_t nrd, nwr;","	char *buf;","","	if (!filename)","		return (0);","","	fd = open(filename, O_RDONLY);","",>16
+|<"	if (fd == -1)","		return (0);","","	buf = malloc(sizeof(char) * (letters));","	if (!buf)","		return (0);","","	nrd = read(fd, buf, letters);","	nwr = write(STDOUT_FILENO, buf, nrd);","","	close(fd);","","	free(buf);","","	return (nwr);","}"
+"9	LINE	0
+	
+		return (w);
+	}
+|3,0,9,1,3,0,1682556464,"","	return (w);","}"
 "s	CHAR	0
 	dfedi i€kb€kr€ýaw
 |3,0,28,0,1,0,1675476082,"dfedi i€kb€kr€ýaw"
@@ -115,230 +447,302 @@
 |3,0,36,0,1,0,1681773341,"}"
 
 # File marks:
-'0  1  3  ~/alx-low_level_programming/0x14-bit_manipulation/101-password
-|4,48,1,3,1682554221,"~/alx-low_level_programming/0x14-bit_manipulation/101-password"
-'1  17  0  ~/alx-low_level_programming/0x14-bit_manipulation/100-get_endianness.c
-|4,49,17,0,1682554088,"~/alx-low_level_programming/0x14-bit_manipulation/100-get_endianness.c"
-'2  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c
-|4,50,22,0,1682553928,"~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c"
-'3  24  0  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,51,24,0,1682553647,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
-'4  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,52,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
-'5  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,53,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
-'6  1  0  ~/so_cool
-|4,54,1,0,1682518917,"~/so_cool"
-'7  15  18  ~/alx-low_level_programming/0x14-bit_manipulation/main.h
-|4,55,15,18,1682518780,"~/alx-low_level_programming/0x14-bit_manipulation/main.h"
-'8  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,56,1,2,1682518630,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
-'9  7  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,57,7,2,1682518630,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
+'0  1  0  ~/FETCH_HEAD
+|4,48,1,0,1682615377,"~/FETCH_HEAD"
+'1  1  0  ~/alx-low_level_programming/0x15-file_io/100-elf_header.c
+|4,49,1,0,1682557896,"~/alx-low_level_programming/0x15-file_io/100-elf_header.c"
+'2  102  0  ~/alx-low_level_programming/0x15-file_io/3-cp.c
+|4,50,102,0,1682557509,"~/alx-low_level_programming/0x15-file_io/3-cp.c"
+'3  1  0  ~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c
+|4,51,1,0,1682557298,"~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c"
+'4  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,52,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+'5  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,53,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+'6  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,54,1,0,1682556611,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+'7  36  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,55,36,0,1682556611,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+'8  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,56,1,0,1682556500,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+'9  36  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,57,36,0,1682556500,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
 
 # Jumplist (newest first):
--'  1  3  ~/alx-low_level_programming/0x14-bit_manipulation/101-password
-|4,39,1,3,1682554221,"~/alx-low_level_programming/0x14-bit_manipulation/101-password"
--'  17  0  ~/alx-low_level_programming/0x14-bit_manipulation/100-get_endianness.c
-|4,39,17,0,1682554088,"~/alx-low_level_programming/0x14-bit_manipulation/100-get_endianness.c"
--'  17  0  ~/alx-low_level_programming/0x14-bit_manipulation/100-get_endianness.c
-|4,39,17,0,1682554088,"~/alx-low_level_programming/0x14-bit_manipulation/100-get_endianness.c"
--'  1  0  ~/alx-low_level_programming/0x14-bit_manipulation/100-get_endianness.c
-|4,39,1,0,1682554013,"~/alx-low_level_programming/0x14-bit_manipulation/100-get_endianness.c"
--'  1  0  ~/alx-low_level_programming/0x14-bit_manipulation/100-get_endianness.c
-|4,39,1,0,1682554013,"~/alx-low_level_programming/0x14-bit_manipulation/100-get_endianness.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c
-|4,39,22,0,1682553928,"~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c
-|4,39,22,0,1682553928,"~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c
-|4,39,22,0,1682553928,"~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c
-|4,39,22,0,1682553928,"~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c"
--'  1  3  ~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c
-|4,39,1,3,1682553830,"~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c"
--'  1  3  ~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c
-|4,39,1,3,1682553830,"~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c"
--'  1  3  ~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c
-|4,39,1,3,1682553830,"~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c"
--'  1  3  ~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c
-|4,39,1,3,1682553830,"~/alx-low_level_programming/0x14-bit_manipulation/5-flip_bits.c"
--'  24  0  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,24,0,1682553647,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  24  0  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,24,0,1682553647,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  24  0  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,24,0,1682553647,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  24  0  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,24,0,1682553647,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  24  0  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,24,0,1682553647,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  24  0  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,24,0,1682553647,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  24  0  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,24,0,1682553647,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  24  0  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,24,0,1682553647,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  1  8  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,1,8,1682553508,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  1  8  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,1,8,1682553508,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  1  8  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,1,8,1682553508,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  1  8  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,1,8,1682553508,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  1  8  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,1,8,1682553508,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  1  8  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,1,8,1682553508,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  1  8  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,1,8,1682553508,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  1  8  ~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c
-|4,39,1,8,1682553508,"~/alx-low_level_programming/0x14-bit_manipulation/4-clear_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  22  0  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,22,0,1682553412,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  1  2  ~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c
-|4,39,1,2,1682552988,"~/alx-low_level_programming/0x14-bit_manipulation/3-set_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  27  0  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,27,0,1682552879,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  1  15  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,1,15,1682552794,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  1  15  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,1,15,1682552794,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  1  15  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,1,15,1682552794,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  1  15  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,1,15,1682552794,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  1  15  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,1,15,1682552794,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  1  15  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,1,15,1682552794,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
--'  1  15  ~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c
-|4,39,1,15,1682552794,"~/alx-low_level_programming/0x14-bit_manipulation/2-get_bit.c"
+-'  1  0  ~/FETCH_HEAD
+|4,39,1,0,1682615377,"~/FETCH_HEAD"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/100-elf_header.c
+|4,39,1,0,1682557896,"~/alx-low_level_programming/0x15-file_io/100-elf_header.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/100-elf_header.c
+|4,39,1,0,1682557896,"~/alx-low_level_programming/0x15-file_io/100-elf_header.c"
+-'  102  0  ~/alx-low_level_programming/0x15-file_io/3-cp.c
+|4,39,102,0,1682557509,"~/alx-low_level_programming/0x15-file_io/3-cp.c"
+-'  102  0  ~/alx-low_level_programming/0x15-file_io/3-cp.c
+|4,39,102,0,1682557509,"~/alx-low_level_programming/0x15-file_io/3-cp.c"
+-'  102  0  ~/alx-low_level_programming/0x15-file_io/3-cp.c
+|4,39,102,0,1682557509,"~/alx-low_level_programming/0x15-file_io/3-cp.c"
+-'  102  0  ~/alx-low_level_programming/0x15-file_io/3-cp.c
+|4,39,102,0,1682557509,"~/alx-low_level_programming/0x15-file_io/3-cp.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/3-cp.c
+|4,39,1,0,1682557414,"~/alx-low_level_programming/0x15-file_io/3-cp.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/3-cp.c
+|4,39,1,0,1682557414,"~/alx-low_level_programming/0x15-file_io/3-cp.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/3-cp.c
+|4,39,1,0,1682557414,"~/alx-low_level_programming/0x15-file_io/3-cp.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/3-cp.c
+|4,39,1,0,1682557414,"~/alx-low_level_programming/0x15-file_io/3-cp.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c
+|4,39,1,0,1682557298,"~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c
+|4,39,1,0,1682557298,"~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c
+|4,39,1,0,1682557298,"~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c
+|4,39,1,0,1682557298,"~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c
+|4,39,1,0,1682557298,"~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c
+|4,39,1,0,1682557298,"~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c
+|4,39,1,0,1682557298,"~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c
+|4,39,1,0,1682557298,"~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  38  0  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,38,0,1682557001,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  1  6  ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+|4,39,1,6,1682556941,"~/alx-low_level_programming/0x15-file_io/1-create_file.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  5  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,5,0,1682556810,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
+-'  1  0  ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+|4,39,1,0,1682556739,"~/alx-low_level_programming/0x15-file_io/0-read_textfile.c"
 
 # History of marks within files (newest to oldest):
+
+> ~/FETCH_HEAD
+	*	1682615340	0
+	"	1	0
+
+> ~/alx-low_level_programming/0x15-file_io/100-elf_header.c
+	*	1682557895	0
+	"	1	0
+	^	1	0
+	.	2	0
+	+	1	0
+	+	1	16
+	+	1	5
+	+	314	0
+	+	2	0
+
+> ~/alx-low_level_programming/0x15-file_io/3-cp.c
+	*	1682557503	0
+	"	102	0
+	^	102	0
+	.	114	0
+	+	114	0
+
+> ~/alx-low_level_programming/0x15-file_io/2-append_text_to_file.c
+	*	1682557289	0
+	"	1	0
+	^	1	0
+	.	2	0
+	+	31	0
+	+	2	0
+
+> ~/alx-low_level_programming/0x15-file_io/1-create_file.c
+	*	1682556999	0
+	"	38	0
+	^	38	1
+	.	38	0
+	+	1	56
+	+	1	19
+	+	39	0
+	+	1	53
+	+	1	0
+	+	1	9
+	+	1	0
+	+	1	1
+	+	1	0
+	+	1	17
+	+	38	0
+
+> ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
+	*	1682556807	0
+	"	5	0
+	^	5	0
+	.	2	0
+	+	1	31
+	+	1	41
+	+	1	15
+	+	1	216
+	+	1	335
+	+	1	17
+	+	1	0
+	+	1	2
+	+	1	0
+	+	1	2
+	+	1	0
+	+	1	17
+	+	1	0
+	+	1	2
+	+	1	0
+	+	1	17
+	+	1	2
+	+	39	0
+	+	2	0
 
 > ~/alx-low_level_programming/0x14-bit_manipulation/101-password
 	*	1682554214	0
@@ -483,44 +887,6 @@
 	^	14	17
 	.	14	16
 	+	14	16
-
-> ~/alx-low_level_programming/0x15-file_io/1-create_file.c
-	*	1681787087	0
-	"	27	6
-	^	27	7
-	.	27	0
-	+	12	56
-	+	17	19
-	+	32	0
-	+	20	53
-	+	30	0
-	+	26	0
-	+	28	0
-	+	26	9
-	+	21	0
-	+	24	1
-	+	26	0
-	+	27	0
-
-> ~/alx-low_level_programming/0x15-file_io/0-read_textfile.c
-	*	1681785162	0
-	"	3	0
-	^	3	0
-	.	4	0
-	+	1	31
-	+	1	41
-	+	1	15
-	+	1	216
-	+	1	335
-	+	1	17
-	+	1	0
-	+	1	2
-	+	8	0
-	+	1	0
-	+	1	2
-	+	30	0
-	+	2	0
-	+	4	0
 
 > ~/alx-low_level_programming/0x14-bit_manipulation/.2-get_bit.c.swp
 	*	1681775045	0
@@ -1176,31 +1542,3 @@
 	^	1	1
 	.	97	0
 	+	97	0
-
-> ~/alx-low_level_programming/0x0B-malloc_free/100-argstostr.c
-	*	1678830956	0
-	"	49	0
-	^	49	1
-	.	49	0
-	+	49	0
-
-> ~/alx-low_level_programming/0x0B-malloc_free/4-free_grid.c
-	*	1678830831	0
-	"	16	0
-	^	16	1
-	.	16	0
-	+	16	0
-
-> ~/alx-low_level_programming/0x0B-malloc_free/3-alloc_grid.c
-	*	1678830776	0
-	"	40	0
-	^	40	1
-	.	40	0
-	+	40	0
-
-> ~/alx-low_level_programming/0x0B-malloc_free/2-str_concat.c
-	*	1678830666	0
-	"	47	0
-	^	47	1
-	.	47	0
-	+	47	0
